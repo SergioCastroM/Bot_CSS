@@ -11,8 +11,8 @@ def start(update, context):
     
 def ConexionSL(update,context):
     response = requests.Session()
-    url = 'https://servicesunit2.abilitysap.com.co:50000/b1s/v1/Login'
-    parameters = {"CompanyDB":"GIMNASIO_LOS_PINOS","UserName":"ABILITYSAP\\glp-jrestrepo","Password":"2o18P1n0s"}
+    url = 'https://:50000/b1s/v1/Login'
+    parameters = {"CompanyDB":"","UserName":"","Password":""}
     headers = {'content-type': 'application/json'}
     response.post(url, data=json.dumps(parameters), headers=headers, verify=False) 
     #if(response.cookies.get)
