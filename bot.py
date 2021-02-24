@@ -63,7 +63,16 @@ def validateInput(update):
             return -1
     except:
         update.message.reply_text("Error de sintaxis. Presiona /help para más información")
-    
+
+def validateInputD(update):
+    try:
+        if int(update.message.text)-1 in dataListiIndex:
+            return int(update.message.text)-1
+        else:
+            return -1
+    except:
+        update.message.reply_text("Error de sintaxis. Presiona /help para más información")   
+
 def addtolist(update, context):
     
     global estadoComando
@@ -73,21 +82,39 @@ def addtolist(update, context):
     getPF(update, responseConect)   
    
     estadoComando = 1
-    print(estadoComando)
-            
-
+                
 def show_list(update, context):
    
     context.bot.send_chat_action(chat_id=update.message.chat_id, action=ChatAction.TYPING)
 
     # Imprimir lista de items
-    update.message.reply_text("Estos son los Artículos Agregados a tu Lista:")
     if len(dataListArticles) > 0:
+        update.message.reply_text("Estos son los Artículos Agregados a tu Lista:")
         for oData in dataListArticles:
-            update.message.reply_text(str(oData.idArticle+1) + " - " + oData.itemName)          
+            update.message.reply_text(str(oData.idArticle+1) + " - " + oData.itemName )          
     else:
-        update.message.reply_text("No tienes items en tu lista")
+        update.message.reply_text("No tienes Artículos en tu lista")
 
+def clear_list(update, context):
+        
+    context.bot.send_chat_action(chat_id=update.message.chat_id, action=ChatAction.TYPING)
+
+    dataListArticles.clear()
+    update.message.reply_text("La lista de artículos fue eliminada")
+
+def rmfromlist(update, context):
+
+    global estadoComando    
+    context.bot.send_chat_action(chat_id=update.message.chat_id, action=ChatAction.TYPING)
+
+    if len(dataListArticles) > 0:
+        update.message.reply_text("Cual de los siguientes Artículos deseas eliminar de tu Lista:")
+        for oData in dataListArticles:
+            update.message.reply_text(str(oData.idArticle+1) + " - " + oData.itemName) 
+        estadoComando = 2                
+    else:
+        update.message.reply_text("No tienes Artículos en tu lista")
+    
 def serializeArticles():
     print("entro serialize")
     x=json.dumps(dataListArticles)
@@ -108,6 +135,7 @@ def manage_text(update, context):
     try:
                 
         if estadoComando == 1 :
+
            index = validateInput(update)
            
            if int(index)>=0:
@@ -115,7 +143,18 @@ def manage_text(update, context):
                update.message.reply_text("El artículo fue agregado a la lista")
                estadoComando = 0
            else:
-               update.message.reply_text("Este numero de artículo no existe")       
+               update.message.reply_text("Este numero de artículo no existe") 
+
+        elif estadoComando == 2:
+
+           index = validateInputD(update)
+           
+           if int(index)>=0:
+               dataListArticles.pop(index)
+               update.message.reply_text("El artículo fue eliminado a la lista")
+               estadoComando = 0
+           else:
+               update.message.reply_text("Este numero de artículo no existe")
         else:
            update.message.reply_text("Disculpa, no puedo entenderte. Presiona /help para más información")
            estadoComando = 0
@@ -168,6 +207,7 @@ if __name__ == '__main__':
 
     dp.add_handler(CommandHandler('addtolist', addtolist))
     dp.add_handler(CommandHandler('show_list', show_list))
+    dp.add_handler(CommandHandler('clear_list', clear_list))
 
     # camptura de comandos y textos
     dp.add_handler(MessageHandler(Filters.text, manage_text))
