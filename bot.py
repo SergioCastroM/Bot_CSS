@@ -1,22 +1,26 @@
 import sqlite3
 import requests
-import resources
 import json
 import logging
-#import resources
-from resources import config
+import src.configIni
+from models import articleModel
 from telegram import ChatAction, ParseMode, ForceReply
 from telegram.ext import Updater, CommandHandler, ConversationHandler, CallbackQueryHandler, MessageHandler, Filters
 from telegram import ChatAction,KeyboardButton, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.error import NetworkError, Unauthorized
-from random import randint
+
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+global estadoComando 
+estadoComando = 0    
+
 DataLista =[]
 
 dataListi=[]
+dataListiIndex=[]
+dataListArticles =[]
 
 cookies=''
 
@@ -51,32 +55,44 @@ def call_back(update, context):
                               chat_id=query.message.chat_id,
                               message_id=query.message.message_id)
 
+def validateInput(update):
+    try:
+        if int(update.message.text)-1 in dataListiIndex:
+            return int(update.message.text)-1
+        else:
+            return -1
+    except:
+        update.message.reply_text("Error de sintaxis. Presiona /help para más información")
+    
 def addtolist(update, context):
     
+    global estadoComando
+
+    context.bot.send_chat_action(chat_id=update.message.chat_id, action=ChatAction.TYPING)
+    responseConect = ConexionSL()
+    getPF(update, responseConect)   
+   
+    estadoComando = 1
+    print(estadoComando)
+            
+
+def show_list(update, context):
+   
     context.bot.send_chat_action(chat_id=update.message.chat_id, action=ChatAction.TYPING)
 
-    strings = update.message.text.lower().split()
-
-    if len(strings) >= 2:
-        strings.remove('/addtolist')
-        
-        chat_id = update.message.chat_id
-        chat_id = str(chat_id)
-        #username = update.message.from_user.username
-
-        for s in strings:
-            
-            DataLista.append({'ItemCode':s,'Price':10000 })
-            print(DataLista)
-
-        update.message.reply_text("Todos los art fueron agregados a la lista")
+    # Imprimir lista de items
+    update.message.reply_text("Estos son los Artículos Agregados a tu Lista:")
+    if len(dataListArticles) > 0:
+        for oData in dataListArticles:
+            update.message.reply_text(str(oData.idArticle+1) + " - " + oData.itemName)          
     else:
-        update.message.reply_text("Error de sintaxis. Presiona /help para más información")
+        update.message.reply_text("No tienes items en tu lista")
 
-def addtolist1(update, context):
-    responseConect = ConexionSL()
-    getPF(update, responseConect)
-    
+def serializeArticles():
+    print("entro serialize")
+    x=json.dumps(dataListArticles)
+    print(x)
+        
 def help(update, context):
     update.message.reply_text("⭕️ /about: Información de la compañía\n"
                               "\n📝 LISTA DE ARTICULOS 📝\n"
@@ -86,42 +102,61 @@ def help(update, context):
                               "/clear_list: Limpia la lista de artículos\n")
 
 def manage_text(update, context):
-        
-    update.message.reply_text("Disculpa, no puedo entenderte. Presiona /help para más información")
+    
+    global estadoComando
+    
+    try:
+                
+        if estadoComando == 1 :
+           index = validateInput(update)
+           
+           if int(index)>=0:
+               dataListArticles.append(dataListi[index])
+               update.message.reply_text("El artículo fue agregado a la lista")
+               estadoComando = 0
+           else:
+               update.message.reply_text("Este numero de artículo no existe")       
+        else:
+           update.message.reply_text("Disculpa, no puedo entenderte. Presiona /help para más información")
+           estadoComando = 0
+
+    except:
+
+        update.message.reply_text("Exc Disculpa, no puedo entenderte. Presiona /help para más información")    
+        estadoComando = 0 
 
 def manage_command(update, context):
     update.message.reply_text("Comando desconocido. Presiona /help para más información")                             
     
 def ConexionSL():
     response = requests.Session()
-    url = 'https://192.168.1.143:50000/b1s/v1/Login'
-    parameters = { "UserName": "manager", "Password": "manager","CompanyDB": "VISDECOL_PRD", "Language": "23"}
-    headers = {'content-type': 'application/json'}
-    response.post(url, data=json.dumps(parameters), headers=headers, verify=False) 
+    #requests.packages.urllib3.disable_warnings()
+    response.post(src.configIni.urlLogin, data=json.dumps(src.configIni.parametersLogin), headers=src.configIni.headers, verify=False) 
     return response 
 
 def getPF (update, responseConect):
     count = 0
     response = responseConect
-    url = 'http://192.168.1.143:50001/b1s/v1/Items?$filter=SalesItem eq \'tYES\''
-    r=response.get(url, verify=False)
+    r=response.get(src.configIni.urlGetItem, verify=False)
     data = r.json()
-    
+    dataListi.clear()
+
     for i in data['value']:
-        class Data:
-            idData=count
-            ItemCode = i['ItemCode']
-            ItemName = i['ItemName']
-            Price = i['ItemName']
-        dataListi.append(Data)
+        articleInstance = articleModel.Article()
+        articleInstance.idArticle = count
+        articleInstance.itemCode = i['ItemCode']
+        articleInstance.itemName = i['ItemName']
+        articleInstance.price = 10000
+        dataListi.append(articleInstance)
+        dataListiIndex.append(count)
         count+=1
     
     for oData in dataListi:
-        update.message.reply_text(str(oData.idData+1) + " - " + oData.ItemName)
+        update.message.reply_text(str(oData.idArticle+1) + " - " + oData.itemName)
 
 if __name__ == '__main__':
 
-    updater = Updater(token= config.API_TOKEN , use_context=True)
+    updater = Updater(token= src.configIni.API_TOKEN , use_context=True)
 
     dp = updater.dispatcher
 
@@ -131,10 +166,10 @@ if __name__ == '__main__':
     dp.add_handler(CommandHandler('about', about))
     dp.add_handler(CallbackQueryHandler(call_back))
 
-    dp.add_handler(CommandHandler('addtolist1', addtolist1))
     dp.add_handler(CommandHandler('addtolist', addtolist))
-    
-    # On noncommand i.e message
+    dp.add_handler(CommandHandler('show_list', show_list))
+
+    # camptura de comandos y textos
     dp.add_handler(MessageHandler(Filters.text, manage_text))
     dp.add_handler(MessageHandler(Filters.command, manage_command))
 
